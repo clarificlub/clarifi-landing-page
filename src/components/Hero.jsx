@@ -9,30 +9,8 @@ import {
   Alert,
 } from '@mui/material';
 import { motion } from 'framer-motion';
-import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, set } from 'firebase/database';
-
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyC_eqHpGIxNalnkuFOSWlH2U8LBqd_p_LI",
-  authDomain: "clarifi-email-list.firebaseapp.com",
-  databaseURL: "https://clarifi-email-list-default-rtdb.firebaseio.com",
-  projectId: "clarifi-email-list",
-  storageBucket: "clarifi-email-list.firebasestorage.app",
-  messagingSenderId: "911822083025",
-  appId: "1:911822083025:web:12fa543ad1332127df06f0",
-  measurementId: "G-FV2ZMDZYX4"
-};
-
-// Initialize Firebase
-let app;
-let db;
-try {
-  app = initializeApp(firebaseConfig);
-  db = getDatabase(app);
-} catch (error) {
-  console.error("Firebase initialization error:", error);
-}
+import { ref, set } from 'firebase/database';
+import { db } from '../firebase';
 
 const BackgroundAnimation = () => {
   const [nodes, setNodes] = useState([]);
@@ -83,7 +61,7 @@ const BackgroundAnimation = () => {
           y: ((node.y + node.velocity.y + 100) % 100),
         }))
       );
-    }, 50); // Update every 50ms for smooth animation
+    }, 50);
 
     return () => clearInterval(interval);
   }, []);
@@ -100,7 +78,6 @@ const BackgroundAnimation = () => {
         zIndex: 0,
       }}
     >
-      {/* Lines between nodes */}
       {lines.map((line) => {
         const fromNode = nodes[line.from];
         const toNode = nodes[line.to];
@@ -137,7 +114,6 @@ const BackgroundAnimation = () => {
         );
       })}
 
-      {/* Nodes */}
       {nodes.map((node) => (
         <motion.div
           key={node.id}
@@ -171,7 +147,6 @@ const BackgroundAnimation = () => {
         />
       ))}
 
-      {/* Gradient Overlays */}
       <Box
         sx={{
           position: 'absolute',
@@ -212,30 +187,24 @@ const Hero = () => {
       return;
     }
 
-    if (!db) {
-      setError('Service temporarily unavailable');
-      return;
-    }
-
     setIsLoading(true);
     setError('');
 
     try {
-      // Generate a unique ID for the email entry
-      const timestamp = new Date().getTime();
-      const emailId = `email_${timestamp}`;
-      
       // Save email with timestamp
-      await set(ref(db, `emails/${emailId}`), {
+      const emailRef = ref(db, 'emails/' + Date.now());
+      console.log('Attempting to save email:', email);
+      await set(emailRef, {
         email,
-        timestamp,
+        timestamp: new Date().toISOString()
       });
+      console.log('Email saved successfully');
 
       setSubmitted(true);
       setEmail('');
     } catch (err) {
       console.error('Failed to save email:', err);
-      setError('Failed to submit. Please try again later.');
+      setError(`Failed to submit: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
