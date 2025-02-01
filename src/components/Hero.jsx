@@ -9,6 +9,30 @@ import {
   Alert,
 } from '@mui/material';
 import { motion } from 'framer-motion';
+import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, set } from 'firebase/database';
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyC_eqHpGIxNalnkuFOSWlH2U8LBqd_p_LI",
+  authDomain: "clarifi-email-list.firebaseapp.com",
+  databaseURL: "https://clarifi-email-list-default-rtdb.firebaseio.com",
+  projectId: "clarifi-email-list",
+  storageBucket: "clarifi-email-list.firebasestorage.app",
+  messagingSenderId: "911822083025",
+  appId: "1:911822083025:web:12fa543ad1332127df06f0",
+  measurementId: "G-FV2ZMDZYX4"
+};
+
+// Initialize Firebase
+let app;
+let db;
+try {
+  app = initializeApp(firebaseConfig);
+  db = getDatabase(app);
+} catch (error) {
+  console.error("Firebase initialization error:", error);
+}
 
 const BackgroundAnimation = () => {
   const [nodes, setNodes] = useState([]);
@@ -177,11 +201,44 @@ const BackgroundAnimation = () => {
 const Hero = () => {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
-    setEmail('');
+    
+    if (!email || !/\S+@\S+\.\S+/.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    if (!db) {
+      setError('Service temporarily unavailable');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      // Generate a unique ID for the email entry
+      const timestamp = new Date().getTime();
+      const emailId = `email_${timestamp}`;
+      
+      // Save email with timestamp
+      await set(ref(db, `emails/${emailId}`), {
+        email,
+        timestamp,
+      });
+
+      setSubmitted(true);
+      setEmail('');
+    } catch (err) {
+      console.error('Failed to save email:', err);
+      setError('Failed to submit. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -198,7 +255,7 @@ const Hero = () => {
     >
       <BackgroundAnimation />
 
-      <Container maxWidth="lg">
+      <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2 }}>
         <Stack spacing={6} alignItems="center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -216,6 +273,8 @@ const Hero = () => {
                 WebkitTextFillColor: 'transparent',
                 mb: 2,
                 textAlign: 'center',
+                position: 'relative',
+                zIndex: 3,
               }}
             >
               Clarifi is Coming Soon
@@ -228,6 +287,8 @@ const Hero = () => {
                 maxWidth: '600px',
                 mx: 'auto',
                 textAlign: 'center',
+                position: 'relative',
+                zIndex: 3,
               }}
             >
               Experience the future of payment management.
@@ -263,6 +324,11 @@ const Hero = () => {
                 placeholder="Enter your email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+                error={!!error}
+                helperText={error}
+                type="email"
+                required
                 sx={{
                   flex: { xs: '1', sm: '1 1 auto' },
                   '& .MuiOutlinedInput-root': {
@@ -287,6 +353,9 @@ const Hero = () => {
                       opacity: 1,
                     },
                   },
+                  '& .MuiFormHelperText-root': {
+                    color: '#f44336',
+                  },
                 }}
                 InputProps={{
                   sx: {
@@ -299,38 +368,44 @@ const Hero = () => {
               <Button
                 type="submit"
                 variant="contained"
+                disabled={isLoading}
                 sx={{
                   height: '54px',
-                  background: 'linear-gradient(45deg, #2196f3, #f50057)',
+                  background: isLoading
+                    ? 'rgba(33, 150, 243, 0.5)'
+                    : 'linear-gradient(45deg, #2196f3, #f50057)',
                   fontSize: '1.1rem',
                   textTransform: 'none',
                   fontWeight: 600,
                   px: { xs: 6, sm: 4 },
-                  flex: { xs: '1', sm: '0 0 auto' },
                   minWidth: { xs: '100%', sm: '160px' },
                   borderRadius: 1.5,
                   '&:hover': {
-                    background: 'linear-gradient(45deg, #1976d2, #dc004e)',
+                    background: isLoading
+                      ? 'rgba(33, 150, 243, 0.5)'
+                      : 'linear-gradient(45deg, #1976d2, #dc004e)',
                   },
                 }}
               >
-                Notify Me
+                {isLoading ? 'Saving...' : 'Notify Me'}
               </Button>
             </Stack>
           </Box>
 
-          {submitted && (
-            <Alert
-              severity="success"
+          {(submitted || error) && (
+            <Alert 
+              severity={error ? 'error' : 'success'}
               sx={{
-                bgcolor: 'rgba(46, 125, 50, 0.1)',
+                bgcolor: error 
+                  ? 'rgba(244, 67, 54, 0.1)'
+                  : 'rgba(46, 125, 50, 0.1)',
                 color: '#fff',
                 '& .MuiAlert-icon': {
-                  color: '#4caf50',
+                  color: error ? '#f44336' : '#4caf50',
                 },
               }}
             >
-              Thanks for signing up! We'll notify you when we launch.
+              {error || 'Thanks for signing up! We\'ll notify you when we launch.'}
             </Alert>
           )}
         </Stack>
